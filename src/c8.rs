@@ -1,3 +1,5 @@
+use std::fs::File;
+use std::io::{Read};
 use crate::font;
 
 pub struct C8 {
@@ -42,18 +44,41 @@ impl C8 {
         instance
     }
 
-    pub fn read_program() {
-        // read a binary file
+    pub fn read_program(&mut self, file_path: &str) {
+        // load a binary file into memory starting at 0x200
+        let mut file = File::open(file_path).expect("Failed to open file");
+        let mut buffer: [u8; 1024] = [0; 1024];
 
-        // load it into memory starting at 0x200
+        let mut mp = 0x200;
+        while let Ok(n) = file.read(&mut buffer) {
+            if n == 0 { break; } // EOF
+
+            for i in 0..n { self.memory[mp + i] = buffer[i]; }
+            mp += n;
+
+            println!("Read {} bytes", n);
+        }
+    }
+
+    pub fn mem_dump(&self) {
+        for i in 0..(self.memory.len() / 16) {
+            print!("{:04X}: ", i * 16); 
+            
+            // 16 bytes per row
+            for j in 0..16 {
+                print!("{:02X} ", self.memory[i * 16 + j]);
+            }
+            
+            println!();
+        }
     }
 
     pub fn emulate_cycle(&mut self) {
         // test
-        self.memory[0] = 0xA2;
-        self.memory[1] = 0xF0;
+        self.memory[0x200] = 0xA2;
+        self.memory[0x201] = 0xF0;
         
-        self.opcode = (self.memory[0] as u16) << 8 | (self.memory[1] as u16);
+        self.opcode = (self.memory[self.pc as usize] as u16) << 8 | (self.memory[(self.pc as usize) + 1] as u16);
 
         self.i_reg = self.opcode & 0x0FFF;
 
