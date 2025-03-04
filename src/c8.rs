@@ -74,16 +74,25 @@ impl C8 {
     }
 
     pub fn emulate_cycle(&mut self) {
-        // test
-        self.memory[0x200] = 0xA2;
-        self.memory[0x201] = 0xF0;
-        
         self.opcode = (self.memory[self.pc as usize] as u16) << 8 | (self.memory[(self.pc as usize) + 1] as u16);
 
-        self.i_reg = self.opcode & 0x0FFF;
+        match self.opcode & 0xF000 {
+            // sets i register to address NNN
+            0xA000 => self.i_reg = self.opcode & 0x0FFF,
 
+            _ => println!("{:04X}: Unknown opcode {:04X}", self.pc, self.opcode),
+        }
         self.pc += 2;
-        println!("{:X}", self.opcode);
-        println!("{:X}", self.i_reg);
+
+        // update timers
+        if self.delay_timer > 0 { self.delay_timer -= 1; }
+        if self.sound_timer > 0 {
+            println!("BEEP");
+            self.sound_timer -= 1;
+        }
+    }
+
+    pub fn get_pc(&self) -> u16 {
+        self.pc
     }
 }

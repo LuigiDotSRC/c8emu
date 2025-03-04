@@ -1,9 +1,11 @@
 mod c8;
 mod font;
 
+use std::thread;
+use std::time::{Duration, Instant};
 use c8::C8;
 
-const OPCODES_PER_SECOND: usize = 500;
+const MICROSECONDS_PER_CYCLE: i32 = 2000;
 
 fn main() {
     // setup graphics
@@ -14,11 +16,23 @@ fn main() {
     // load game
     chip_8.read_program("bin/output.bin");
     chip_8.mem_dump();
-    // emulation loop
 
-        // emulate cycle
+    let cycle_duration = Duration::from_micros(2000);
+    // emulation loop
+    loop {
+        if chip_8.get_pc() >= 4096 { break; }
+
+        let start_time = Instant::now();
+
         chip_8.emulate_cycle();
-        // drawGraphics if draw fag is set
+
+        // drawGraphics if draw flag is set
 
         // store key press states
+
+        let elapsed = start_time.elapsed();
+        if elapsed < cycle_duration {
+            thread::sleep(cycle_duration - elapsed);
+        }
+    }
 }
