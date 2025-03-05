@@ -76,6 +76,10 @@ impl C8 {
     pub fn emulate_cycle(&mut self) {
         self.opcode = (self.memory[self.pc as usize] as u16) << 8 | (self.memory[(self.pc as usize) + 1] as u16);
 
+        let x: u8 = ((self.opcode & 0x0F00) >> 8) as u8;
+        let y: u8 = ((self.opcode & 0x00F0) >> 4) as u8;
+        let nn: u8 = (self.opcode & 0x00FF) as u8;
+
         match self.opcode & 0xF000 {
             0x0000 => {
                 match self.opcode & 0x0FFF {
@@ -99,37 +103,80 @@ impl C8 {
                 self.pc = self.opcode & 0x0FFF;
             }
 
+            // COND: skip next instruction if VX = NN
+            0x3000 => {
+                if nn == self.v_regs[x as usize] {
+                    self.pc += 2;
+                }
+                self.pc += 2;
+            }
+
+            // COND: skip next instruction if VX != NN
+            0x4000 => {
+                if nn != self.v_regs[x as usize] {
+                    self.pc += 2;
+                }
+                self.pc += 2;
+            }
+
+            // COND: skip next instruction if VX = VY
+            0x5000 => {
+                if self.v_regs[x as usize] == self.v_regs[y as usize] {
+                    self.pc += 2;
+                }
+                self.pc += 2;
+            }
+
+            0x8000 => {
+                match self.opcode & 0x000F {
+                    // ASSIGN: set VX to VY
+                    0x0000 => {
+                        self.v_regs[x as usize] = self.v_regs[y as usize];
+                        self.pc += 2;
+                    }
+
+                    _ => self.unknown_opcode(),
+                }
+            }
+
             // MEM: sets i register to address NNN
-            0xA000 => self.i_reg = self.opcode & 0x0FFF,
+            0xA000 => {
+                self.i_reg = self.opcode & 0x0FFF;
+                self.pc += 2;
+            }
 
             // FLOW: jumps to address NNN + V0
             0xB000 => self.pc = (self.opcode & 0x0FFF) + self.v_regs[0] as u16, 
 
-            0xF000 => {
-                let x: usize = ((self.opcode & 0x0F00) >> 8) as usize;
-                
+            0xF000 => {                
                 match self.opcode & 0x00FF {
                     // MEM: add VX to I
-                    0x001E => self.i_reg += self.v_regs[x] as u16,
+                    0x001E => {
+                        self.i_reg += self.v_regs[x as usize] as u16;
+                        self.pc += 2;
+                    }
 
                     // MEM: set I to locaiton of sprite fontset for char (lowest nibble) in VX
                     0x0029 => {
-                        let c: u8 = self.v_regs[x] & 0x0F;
+                        let c: u8 = self.v_regs[x as usize] & 0x0F;
                         self.i_reg = 0x0000 + (c as u16 * 5);
+                        self.pc += 2;
                     }
 
                     // MEM: store V0 to VX in memory starting at I
                     0x0055 => {
-                        for i in 0..x {
-                            self.memory[self.i_reg as usize + i] = self.v_regs[i];
+                        for i in 0..=x {
+                            self.memory[self.i_reg as usize + i as usize] = self.v_regs[i as usize];
                         }
+                        self.pc += 2;
                     }
 
                     // MEM: load V0 to VX from memory starting at I
                     0x0065 => {
-                        for i in 0..x {
-                            self.v_regs[i] = self.memory[self.i_reg as usize + i];
+                        for i in 0..=x {
+                            self.v_regs[i as usize] = self.memory[self.i_reg as usize + i as usize];
                         }
+                        self.pc += 2;
                     }
 
                     _ => self.unknown_opcode(),
@@ -138,7 +185,6 @@ impl C8 {
 
             _ => self.unknown_opcode(),
         }
-        self.pc += 2;
 
         // update timers
         if self.delay_timer > 0 { self.delay_timer -= 1; }
@@ -152,7 +198,8 @@ impl C8 {
         self.pc
     }
 
-    fn unknown_opcode(&self) {
+    fn unknown_opcode(&mut self) {
         println!("{:04X}: Unknown opcode {:04X}", self.pc, self.opcode);
+        self.pc += 2;
     }
 }
