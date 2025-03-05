@@ -1,5 +1,6 @@
 use std::fs::File;
 use std::io::{Read};
+use rand::Rng;
 use crate::font;
 
 pub struct C8 {
@@ -165,10 +166,33 @@ impl C8 {
                         self.pc += 2;
                     }
 
+                    // MATH: VX += XY, set VF to 1 if overflow else 0
+                    0x0004 => {
+                        let sum = self.v_regs[x as usize] as u16 + self.v_regs[y as usize] as u16;
+                        self.v_regs[0xF] = (sum > 0xFF) as u8; 
+                        self.v_regs[x as usize] = sum as u8;
+                        self.pc += 2;
+                    }
+
+                    // MATH: VX -= VY, set VF to 0 if underflow else 1
+                    0x0005 => {
+                        self.v_regs[0xF] = (self.v_regs[x as usize] >= self.v_regs[y as usize]) as u8;
+                        self.v_regs[x as usize] = self.v_regs[x as usize].wrapping_sub(self.v_regs[y as usize]);
+                        self.pc += 2;
+                    }
+
+
                     // BITOP: shift VX to the right by 1, set VF to prev LSB  
                     0x0006 => {
                         self.v_regs[0xF] = self.v_regs[x as usize] & 0x01;
                         self.v_regs[x as usize] >>= 1;
+                        self.pc += 2;
+                    }
+
+                    // MATH: VX = VY - VX, set VF to 0 if underflow else 1
+                    0x0007 => {
+                        self.v_regs[0xF] = (self.v_regs[x as usize] <= self.v_regs[y as usize]) as u8;
+                        self.v_regs[x as usize] = self.v_regs[y as usize].wrapping_sub(self.v_regs[x as usize]);
                         self.pc += 2;
                     }
 
@@ -191,6 +215,13 @@ impl C8 {
 
             // FLOW: jumps to address NNN + V0
             0xB000 => self.pc = (self.opcode & 0x0FFF) + self.v_regs[0] as u16, 
+
+            // RAND: set VX to result of NN & rand(0,255)
+            0xC000 => {
+                let rand_num: u8 = rand::thread_rng().gen_range(0..=255);
+                self.v_regs[x as usize] = nn & rand_num;
+                self.pc += 2;
+            }
 
             0xF000 => {                
                 match self.opcode & 0x00FF {
