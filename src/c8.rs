@@ -77,33 +77,55 @@ impl C8 {
         self.opcode = (self.memory[self.pc as usize] as u16) << 8 | (self.memory[(self.pc as usize) + 1] as u16);
 
         match self.opcode & 0xF000 {
-            // sets i register to address NNN
+            0x0000 => {
+                match self.opcode & 0x0FFF {
+                    // FLOW: return from subroutine
+                    0x00EE => {
+                        self.sp -= 1;
+                        self.pc = self.stack[self.sp as usize];
+                    }
+
+                    _ => self.unknown_opcode(),
+                }
+            }
+            // FLOW: jump to address NNN
+            0x1000 => self.pc = self.opcode & 0x0FFF,
+
+            // FLOW: call subroutine at NNN
+            0x2000 => {
+                self.stack[self.sp as usize] = self.pc + 2; // 2 byte offset
+                self.sp += 1;
+
+                self.pc = self.opcode & 0x0FFF;
+            }
+
+            // MEM: sets i register to address NNN
             0xA000 => self.i_reg = self.opcode & 0x0FFF,
 
-            // jumps to address NNN + V0
+            // FLOW: jumps to address NNN + V0
             0xB000 => self.pc = (self.opcode & 0x0FFF) + self.v_regs[0] as u16, 
 
             0xF000 => {
                 let x: usize = ((self.opcode & 0x0F00) >> 8) as usize;
                 
                 match self.opcode & 0x00FF {
-                    // add VX to I
+                    // MEM: add VX to I
                     0x001E => self.i_reg += self.v_regs[x] as u16,
 
-                    // set I to locaiton of sprite fontset for char (lowest nibble) in VX
+                    // MEM: set I to locaiton of sprite fontset for char (lowest nibble) in VX
                     0x0029 => {
                         let c: u8 = self.v_regs[x] & 0x0F;
                         self.i_reg = 0x0000 + (c as u16 * 5);
                     }
 
-                    // store V0 to VX in memory starting at I
+                    // MEM: store V0 to VX in memory starting at I
                     0x0055 => {
                         for i in 0..x {
                             self.memory[self.i_reg as usize + i] = self.v_regs[i];
                         }
                     }
 
-                    // load V0 to VX from memory starting at I
+                    // MEM: load V0 to VX from memory starting at I
                     0x0065 => {
                         for i in 0..x {
                             self.v_regs[i] = self.memory[self.i_reg as usize + i];

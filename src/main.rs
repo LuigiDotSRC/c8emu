@@ -5,7 +5,7 @@ use std::thread;
 use std::time::{Duration, Instant};
 use c8::C8;
 
-const MICROSECONDS_PER_CYCLE: i32 = 2000;
+const MICROSECONDS_PER_CYCLE: u64 = 2000;
 
 fn main() {
     // setup graphics
@@ -17,7 +17,7 @@ fn main() {
     chip_8.read_program("bin/output.bin");
     chip_8.mem_dump();
 
-    let cycle_duration = Duration::from_micros(2000);
+    let cycle_duration = Duration::from_micros(MICROSECONDS_PER_CYCLE);
     // emulation loop
     loop {
         if chip_8.get_pc() >= 4096 { break; }
