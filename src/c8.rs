@@ -127,11 +127,55 @@ impl C8 {
                 self.pc += 2;
             }
 
+            // CONST: set VX to NN
+            0x6000 => {
+                self.v_regs[x as usize] = nn;
+                self.pc += 2;
+            }
+
+            // CONST: add NN to VX
+            0x7000 => {
+                self.v_regs[x as usize] += nn;
+                self.pc += 2;
+            }
+
             0x8000 => {
                 match self.opcode & 0x000F {
                     // ASSIGN: set VX to VY
                     0x0000 => {
                         self.v_regs[x as usize] = self.v_regs[y as usize];
+                        self.pc += 2;
+                    }
+
+                    // BITOP: VX = VX or VY
+                    0x0001 => {
+                        self.v_regs[x as usize] |= self.v_regs[y as usize];
+                        self.pc += 2;
+                    }
+
+                    // BITOP: VX = VX and VY
+                    0x0002 => {
+                        self.v_regs[x as usize] &= self.v_regs[y as usize];
+                        self.pc += 2;
+                    }
+
+                    // BITOP: VX = VX xor VY
+                    0x0003 => {
+                        self.v_regs[x as usize] ^= self.v_regs[y as usize];
+                        self.pc += 2;
+                    }
+
+                    // BITOP: shift VX to the right by 1, set VF to prev LSB  
+                    0x0006 => {
+                        self.v_regs[0xF] = self.v_regs[x as usize] & 0x01;
+                        self.v_regs[x as usize] >>= 1;
+                        self.pc += 2;
+                    }
+
+                    // BITOP: shift VX to left by 1, set VF to prev MSB
+                    0x000E => {
+                        self.v_regs[0xF] = (self.v_regs[x as usize] & 0x80) >> 7;
+                        self.v_regs[x as usize] <<= 1;
                         self.pc += 2;
                     }
 
