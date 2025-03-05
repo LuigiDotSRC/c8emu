@@ -11,6 +11,7 @@ pub struct C8 {
     opcode: u16,
 
     gfx: [[u8; 64]; 32],
+    draw: bool,
 
     delay_timer: u8,
     sound_timer: u8,
@@ -30,6 +31,7 @@ impl C8 {
             pc: 0x200, // programs expected to start at 0x200
             opcode: 0x0000,
             gfx: [[0x00; 64]; 32],
+            draw: true,
             delay_timer: 0x00,
             sound_timer: 0x00,
             stack: [0x0000; 16],
@@ -81,6 +83,7 @@ impl C8 {
         let y: u8 = ((self.opcode & 0x00F0) >> 4) as u8;
         let nn: u8 = (self.opcode & 0x00FF) as u8;
 
+        // TODO: implement: Display, KeyOp, Sound, Timer opcodes
         match self.opcode & 0xF000 {
             0x0000 => {
                 match self.opcode & 0x0FFF {
@@ -89,8 +92,16 @@ impl C8 {
                         self.sp -= 1;
                         self.pc = self.stack[self.sp as usize];
                     }
-
-                    _ => self.unknown_opcode(),
+                    
+                    _ => {
+                        // CALL: deprecated machine code call to RCA 1802
+                        if self.opcode & 0xF000 == 0x0000 {
+                            println!("{:04X}: NO-OP {:04X}", self.pc, self.opcode);
+                            self.pc += 2;
+                        } else {
+                            self.unknown_opcode();
+                        }
+                    }
                 }
             }
             // FLOW: jump to address NNN
@@ -238,6 +249,15 @@ impl C8 {
                         self.pc += 2;
                     }
 
+                    // BCD: store the bcd of VX starting at I
+                    0x0033 => {
+                        let num = self.v_regs[x as usize];
+                        self.memory[self.i_reg as usize] = num / 100;
+                        self.memory[(self.i_reg + 1) as usize] = (num % 100) / 10;
+                        self.memory[(self.i_reg + 2) as usize] = num % 10;
+                        self.pc += 2;
+                    }
+
                     // MEM: store V0 to VX in memory starting at I
                     0x0055 => {
                         for i in 0..=x {
@@ -271,6 +291,14 @@ impl C8 {
 
     pub fn get_pc(&self) -> u16 {
         self.pc
+    }
+
+    pub fn get_draw(&self) -> bool {
+        self.draw
+    }
+
+    pub fn get_gfx(&self) -> [[u8; 64]; 32] {
+        self.gfx
     }
 
     fn unknown_opcode(&mut self) {
