@@ -312,6 +312,12 @@ impl C8 {
 
             0xF000 => {                
                 match self.opcode & 0x00FF {
+                    // TIMER: set VX to delay timer
+                    0x0007 => {
+                        self.v_regs[x as usize] = self.delay_timer;
+                        self.pc += 2;
+                    }
+
                     // KEYOP: key press is awaited and then stored in VX, all instructions halted until next key event, delay and sound timers continue processing
                     0x000A => {
                         let mut key_pressed = false;
@@ -327,6 +333,18 @@ impl C8 {
                         if key_pressed {
                             self.pc += 2;
                         }
+                    }
+
+                    // TIMER: set delay timer to VX
+                    0x0015 => {
+                        self.delay_timer = self.v_regs[x as usize];
+                        self.pc += 2;
+                    }
+
+                    // SOUND: set sound timer to VX
+                    0x0018 => {
+                        self.sound_timer = self.v_regs[x as usize];
+                        self.pc += 2;
                     }
 
                     // MEM: add VX to I
