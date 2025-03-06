@@ -36,7 +36,7 @@ impl C8 {
             gfx: [[0x00; 64]; 32],
             draw: true,
             delay_timer: 0x00,
-            sound_timer: 0x01,
+            sound_timer: 0x00,
             stack: [0x0000; 16],
             sp: 0x0000,
             key: [0x00; 16]
@@ -85,6 +85,7 @@ impl C8 {
         let x: u8 = ((self.opcode & 0x0F00) >> 8) as u8;
         let y: u8 = ((self.opcode & 0x00F0) >> 4) as u8;
         let nn: u8 = (self.opcode & 0x00FF) as u8;
+        let n: u8 = (self.opcode & 0x000F) as u8;
 
         // TODO: implement: Display, KeyOp, Sound, Timer opcodes
         match self.opcode & 0xF000 {
@@ -246,6 +247,39 @@ impl C8 {
                 let rand_num: u8 = rand::thread_rng().gen_range(0..=255);
                 self.v_regs[x as usize] = nn & rand_num;
                 self.pc += 2;
+            }
+
+            // DISPLAY: Draw sprite at VX, VY width of 8 and height of N pixels, must read rows from I to I+N, VF set to 1 if any pixel is unset otherwise 0
+            0xD000 => {
+                let start_x = self.v_regs[x as usize] as usize;
+                let start_y = self.v_regs[y as usize] as usize;
+                let collision = false;
+
+                for row in 0..n {
+                    let sprite_data = self.memory[(self.i_reg + row) as usize];
+                    
+                    for bit in 0..8 {
+                        let x_pos = (start_x + bit) % 64;
+                        let y_pos = (start_y + row) % 32;
+
+                        let pixel = (sprite_data >> (7 - bit)) & 0x01;
+
+                        if pixel == 1 {
+                            // collision detected
+                            if self.gfx[y_pos][x_pos] == 1 {
+                                self.v_regs[0xF] = 0x01;
+                                collision = true;
+                            }
+
+                            // draw pixel
+                            self.gfx[y_pos][x_pos] ^= 0x01;
+                        }
+                    }
+                }
+
+                if !collision {
+                    self.v_regs[0xF] = 0x00;
+                }
             }
 
             0xF000 => {                
