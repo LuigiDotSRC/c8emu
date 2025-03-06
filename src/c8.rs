@@ -92,6 +92,17 @@ impl C8 {
                         self.sp -= 1;
                         self.pc = self.stack[self.sp as usize];
                     }
+
+                    // DISPLAY: clear display
+                    0x00E0 => {
+                        for y in 0..32 {
+                            for x in 0..64 {
+                                self.gfx[y][x] = 0x00;
+                            }
+                        }
+                        self.draw = true;
+                        self.pc += 2;
+                    }
                     
                     _ => {
                         // CALL: deprecated machine code call to RCA 1802
