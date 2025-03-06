@@ -1,6 +1,9 @@
 use std::fs::File;
 use std::io::{Read};
+use std::time::Duration;
 use rand::Rng;
+use rodio::{OutputStream, Sink};
+use rodio::source::{SineWave, Source};
 use crate::font;
 
 pub struct C8 {
@@ -33,7 +36,7 @@ impl C8 {
             gfx: [[0x00; 64]; 32],
             draw: true,
             delay_timer: 0x00,
-            sound_timer: 0x00,
+            sound_timer: 0x01,
             stack: [0x0000; 16],
             sp: 0x0000,
             key: [0x00; 16]
@@ -295,7 +298,7 @@ impl C8 {
         // update timers
         if self.delay_timer > 0 { self.delay_timer -= 1; }
         if self.sound_timer > 0 {
-            println!("BEEP");
+            C8::play_beep();
             self.sound_timer -= 1;
         }
     }
@@ -315,5 +318,17 @@ impl C8 {
     fn unknown_opcode(&mut self) {
         println!("{:04X}: Unknown opcode {:04X}", self.pc, self.opcode);
         self.pc += 2;
+    }
+
+    fn play_beep() { 
+        let (_stream, stream_handle) = OutputStream::try_default().unwrap();
+        let sink = Sink::try_new(&stream_handle).unwrap();
+
+        let source = SineWave::new(440.0)
+            .take_duration(Duration::from_secs_f32(0.25))
+            .amplify(0.20);
+
+        sink.append(source);
+        sink.sleep_until_end(); 
     }
 }
