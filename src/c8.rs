@@ -22,7 +22,7 @@ pub struct C8 {
     stack: [u16; 16],// 16 levels of nesting
     sp: u16,
     
-    key: [u8; 16], // hex keyboard
+    keys: [u8; 16], // hex keyboard
 }
 
 impl C8 {
@@ -39,7 +39,7 @@ impl C8 {
             sound_timer: 0x00,
             stack: [0x0000; 16],
             sp: 0x0000,
-            key: [0x00; 16]
+            keys: [0x00; 16],
         };
 
         // load fontset
@@ -87,7 +87,7 @@ impl C8 {
         let nn: u8 = (self.opcode & 0x00FF) as u8;
         let n: u8 = (self.opcode & 0x000F) as u8;
 
-        // TODO: implement: Display, KeyOp, Sound, Timer opcodes
+        // TODO: implement: KeyOp, Sound, Timer opcodes
         match self.opcode & 0xF000 {
             0x0000 => {
                 match self.opcode & 0x0FFF {
@@ -253,14 +253,14 @@ impl C8 {
             0xD000 => {
                 let start_x = self.v_regs[x as usize] as usize;
                 let start_y = self.v_regs[y as usize] as usize;
-                let collision = false;
+                let mut collision = false;
 
                 for row in 0..n {
-                    let sprite_data = self.memory[(self.i_reg + row) as usize];
+                    let sprite_data = self.memory[(self.i_reg + row as u16) as usize];
                     
                     for bit in 0..8 {
                         let x_pos = (start_x + bit) % 64;
-                        let y_pos = (start_y + row) % 32;
+                        let y_pos = (start_y + row as usize) % 32;
 
                         let pixel = (sprite_data >> (7 - bit)) & 0x01;
 
@@ -280,10 +280,55 @@ impl C8 {
                 if !collision {
                     self.v_regs[0xF] = 0x00;
                 }
+
+                self.pc += 2;
+            }
+
+            0xE000 => {
+                match self.opcode & 0x00FF {
+                    // KEYOP: skip next instruction if key in VX (lowest nibble) is pressed
+                    0x009E => {
+                        let key = (self.v_regs[x as usize] & 0x0F) as usize;
+                        if self.keys[key] > 0x00 {
+                            self.pc += 2;
+                        }
+
+                        self.pc += 2;
+                    }
+
+                    // KEYOP: skip next instruction if key stored in VX (lowest nibble) is not pressed
+                    0x00A1 => {
+                        let key = (self.v_regs[x as usize] & 0x0F) as usize;
+                        if self.keys[key] == 0x00 {
+                            self.pc += 2;
+                        }
+                        
+                        self.pc += 2;
+                    }
+
+                    _ => self.unknown_opcode(),
+                }
             }
 
             0xF000 => {                
                 match self.opcode & 0x00FF {
+                    // KEYOP: key press is awaited and then stored in VX, all instructions halted until next key event, delay and sound timers continue processing
+                    0x000A => {
+                        let mut key_pressed = false;
+
+                        for i in 0..16 {
+                            if self.keys[i] != 0 {
+                                self.v_regs[x as usize] = i as u8;
+                                key_pressed = true;
+                                break;
+                            }
+                        }
+
+                        if key_pressed {
+                            self.pc += 2;
+                        }
+                    }
+
                     // MEM: add VX to I
                     0x001E => {
                         self.i_reg += self.v_regs[x as usize] as u16;
@@ -347,6 +392,10 @@ impl C8 {
 
     pub fn get_gfx(&self) -> [[u8; 64]; 32] {
         self.gfx
+    }
+
+    pub fn set_keys(&mut self, keys: [u8; 16]) {
+        self.keys = keys;
     }
 
     fn unknown_opcode(&mut self) {
