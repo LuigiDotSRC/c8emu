@@ -87,7 +87,6 @@ impl C8 {
         let nn: u8 = (self.opcode & 0x00FF) as u8;
         let n: u8 = (self.opcode & 0x000F) as u8;
 
-        // TODO: implement: KeyOp, Sound, Timer opcodes
         match self.opcode & 0xF000 {
             0x0000 => {
                 match self.opcode & 0x0FFF {
@@ -162,7 +161,7 @@ impl C8 {
 
             // CONST: add NN to VX
             0x7000 => {
-                self.v_regs[x as usize] += nn;
+                self.v_regs[x as usize] = self.v_regs[x as usize].wrapping_add(nn);
                 self.pc += 2;
             }
 
